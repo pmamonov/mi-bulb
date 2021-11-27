@@ -24,7 +24,11 @@
 
 #include "driver/pwm.h"
 
-static const char *TAG = "pwm_example";
+#include "main.h"
+
+static const char *TAG = "MAIN";
+
+volatile unsigned long br = 90;
 
 // PWM period 1000us(1Khz), same as depth
 #define PWM_PERIOD    (1000)
@@ -33,20 +37,26 @@ static const char *TAG = "pwm_example";
 void app_main()
 {
     uint32_t pin = PWM_PIN;
-    uint32_t duty = 0;
+    uint32_t duty = PWM_PERIOD * br / 100;
     float phase = 0;
+    int br_old = br;
 
     pwm_init(PWM_PERIOD, &duty, 1, &pin);
     pwm_set_phases(&phase);
     pwm_start();
 
+    start_http();
+
     while (1) {
-        ESP_LOGI(TAG, "%d\n", duty);
-        pwm_set_duties(&duty);
-        pwm_start();
-        vTaskDelay(configTICK_RATE_HZ);
-#define STEP    (PWM_PERIOD / 10)
-        duty = (duty + STEP) % (PWM_PERIOD + STEP);
+        if (br != br_old) {
+            duty = PWM_PERIOD * br / 100;
+            br_old = br;
+            ESP_LOGI(TAG, "%d\n", duty);
+            pwm_set_duties(&duty);
+            pwm_start();
+        }
+
+        vTaskDelay(configTICK_RATE_HZ / 10);
     }
 }
 
