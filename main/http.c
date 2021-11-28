@@ -34,6 +34,13 @@ static const char *resp =
 "<input type='number' name='br'></input>"
 "<input type='submit' value='OK'>"
 "</form>"
+"<hr><h1>Update firmware</h1>"
+"<form action='/update' method='get'>"
+"Host: <input name='h'></input><br>"
+"Port: <input name='p'></input><br>"
+"FIXME (url_decode): File path: <input name='f'></input><br>"
+"<input type='submit' value='UPDATE'>"
+"</form>"
 "</body></html>";
 
 /* An HTTP GET handler */
@@ -71,6 +78,61 @@ httpd_uri_t root = {
     .handler   = root_get_handler,
 };
 
+
+static void ota_var_init(char *buf, char *key, char **ota_var)
+{
+    char param[128];
+
+    if (httpd_query_key_value(buf, key, param, sizeof(param)) == ESP_OK) {
+        ESP_LOGI(TAG, "%s: %s=`%s`\n", __func__,  key, param);
+        *ota_var = malloc(1 + strlen(param));
+        if (!*ota_var) {
+            ESP_LOGI(TAG, "%s: malloc failed\n", __func__);
+            return;
+        }
+        memcpy(*ota_var, param, 1 + strlen(param));
+    }
+}
+
+static esp_err_t update_get_handler(httpd_req_t *req)
+{
+    char*  buf;
+    size_t buf_len;
+
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1) {
+        buf = malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            ota_var_init(buf, "h", &ota_host);
+            ota_var_init(buf, "p", &ota_port);
+            ota_var_init(buf, "f", &ota_file);
+        }
+        free(buf);
+    }
+
+    if (ota_host && ota_port && ota_file) {
+        httpd_resp_send(req, "OK", 2);
+        start_ota();
+    } else {
+        if (ota_host)
+            free(ota_host);
+        if (ota_port)
+            free(ota_port);
+        if (ota_file)
+            free(ota_file);
+        ota_host = ota_port = ota_file = NULL;
+        httpd_resp_send(req, "FAIL", 4);
+    }
+
+    return ESP_OK;
+}
+
+static httpd_uri_t update = {
+    .uri       = "/update",
+    .method    = HTTP_GET,
+    .handler   = update_get_handler,
+};
+
 httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -82,6 +144,7 @@ httpd_handle_t start_webserver(void)
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &root);
+        httpd_register_uri_handler(server, &update);
         return server;
     }
 
