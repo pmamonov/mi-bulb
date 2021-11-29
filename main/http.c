@@ -41,6 +41,7 @@ static const char *resp =
 "FIXME (url_decode): File path: <input name='f'></input><br>"
 "<input type='submit' value='UPDATE'>"
 "</form>"
+"<hr>Version: " VERSION
 "</body></html>";
 
 /* An HTTP GET handler */
